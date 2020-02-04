@@ -612,6 +612,8 @@ The user can define key bindings by creating a mode that is loaded before any
 other mode.  In your configuration file:
 
 #+begin_src lisp
+(in-package :next-user)
+
 (defvar *my-keymap* (make-keymap)
   "Keymap for `my-mode'.")
 
@@ -622,7 +624,7 @@ other mode.  In your configuration file:
 
 (defclass my-buffer (buffer)
   ((default-modes :initform
-     (cons 'vi-normal-mode (get-default 'buffer 'default-modes)))))
+     (cons 'my-mode (get-default 'buffer 'default-modes)))))
 
 (setf *buffer-class* 'my-buffer)
 #+end_src
