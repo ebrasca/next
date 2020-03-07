@@ -9,15 +9,20 @@
 (defvar *free-args* '()
   "The list of positional command line arguments.")
 
+(defvar *keep-alive* t
+  "If non-nil, don't terminate the Lisp process when quitting the browser.
+This is useful when the browser is run from a REPL so that quitting does not
+close the connection.")
+
 @export
-(defvar *interface* nil
+(defvar *browser* nil
   "The entry-point object to a complete instance of Next.
 It can be initialized with
 
-  (setf *interface* (make-instance *remote-interface-class*))
+  (setf *browser* (make-instance *browser-class*))
 
 It's possible to run multiple interfaces of Next at the same time.  You can
-let-bind *interface* to temporarily switch interface.")
+let-bind *browser* to temporarily switch interface.")
 
 (declaim (type next-hooks:hook-void *after-init-hook*))
 @export
@@ -25,7 +30,7 @@ let-bind *interface* to temporarily switch interface.")
   "The entry-point object to configure everything in Next.
 The hook takes no argument.
 
-This hook is run after the `*interface*' is instantiated and before the
+This hook is run after the `*browser*' is instantiated and before the
 `startup-function' is run.
 
 Add a handler can be added with
@@ -41,23 +46,6 @@ Add a handler can be added with
 (defvar *swank-port* 4006
   "The port that Swank will open a new server on (default Emacs SLIME port
 is 4005, default set to 4006 in Next to avoid collisions).")
-
-(defparameter +platform-port-name+ "engineer.atlas.next.platform")
-(defparameter +platform-port-object-path+ "/engineer/atlas/next/platform")
-(defparameter +platform-port-interface+ +platform-port-name+)
-
-(defparameter +core-name+ "engineer.atlas.next.core")
-(defparameter +core-object-path+ "/engineer/atlas/next/core")
-(defparameter +core-interface+ +core-name+)
-
-@export
-(defparameter +dbus-launch-command+ '("dbus-launch")
-  "The command to start dbus, if necessary.
-The first string is the command, the other strings are the arguments.")
-
-@export
-(defparameter +platform-port-command+ "next-platform-port"
-  "The command to start the platform port.")
 
 @export
 (defparameter +version+

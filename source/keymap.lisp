@@ -1,5 +1,36 @@
 ;;; keymap.lisp --- lisp subroutines for key binding detection
 
+;; TODO: Fix doubled keys / broken stack.
+;; TODO: Fix dead keys in the minibuffer.
+;; TODO: Rename to input.lisp.
+;; TODO: Check out lispkit / lem / nomad / emacsy.  Emacsy implementation is good.
+
+;; TODO: Turn into a library.
+;; TODO: Add tests.
+
+;; TODO: Support self-insertable keys.  Make sure dead keys work.
+;; TODO: Add customizable function when key is not found.
+;; TODO: Make modifiers customizable.
+;; TODO: Remove intermediary serialization.
+;; TODO: Perform key translation, e.g. if s-FOO is not bound, call command bound to FOO.
+;; TODO: Decide of a key string protocol: https://github.com/atlas-engineer/next/issues/564
+;; TODO: Fix define-key: lambda list, type, compile-time key string checking.
+;; TODO: Use CUA scheme by default.
+;; TODO: Support key codes.  Make sure it's dynamic, i.e. when the keyboard
+;; layout changes, the binding should remain on the same hardware keys.
+;; TODO: Support keymap inheritance.
+
+;; TODO: Bind key to keymap / keymap prefix.  Better: use this to break down
+;; multi-stroke bindings.  E.g. if we have C-x C-f and C-x C-b, then C-x binds
+;; to an anonymous keymap and C-f and C-b are bound in the key map.  This makes
+;; implementation of which-key trivial + it allows for binding prefix keys to keymaps.
+;; TODO: which-key: List all bindings with some prefix.
+;; TODO: List command bindings (find Emacs equivalent name).  Make sure it's
+;; dynamic, e.g. that it's updated when the keymap scheme is updated.
+;; TODO: Make sure it's easy enough to set global bindings.
+;; TODO: Implement `C-h k`: documentation for keypresses.  Make sure it tells
+;; which keymap it's defined in.
+
 (in-package :next)
 (annot:enable-annot-syntax)
 
@@ -14,15 +45,15 @@
 (defmethod set-key ((map keymap) key-sequence-string command)
   "Bind KEY-SEQUENCE-STRING to COMMAND in MAP.
 
-A sequence of \"C-x\" \"C-s\" \"C-a\" will be broken up into three keys for the
-mode map, which are
+  A sequence of 'C-x' 'C-s' 'C-a' will be broken up into three
+  keys for the mode map, which are
 
-  \"C-x\" \"C-s\" \"C-a\" - points to COMMAND
-  \"C-x\" \"C-s\"         - set to \"prefix\"
-  \"C-x\"                 - set to \"prefix\"
+  'C-x' 'C-s' 'C-a' - points to COMMAND
+  'C-x' 'C-s'         - set to 'prefix'
+  'C-x'                 - set to 'prefix'
 
-When a key is set to #'prefix it will not consume the stack, so that a
-sequence of keys longer than one key-chord can be recorded."
+  When a key is set to #'prefix it will not consume the stack, so that
+  a sequence of keys longer than one key-chord can be recorded."
   (let ((key-sequence (key key-sequence-string)))
     (setf (gethash key-sequence (table map)) command)
     ;; generate prefix representations
@@ -38,8 +69,6 @@ sequence of keys longer than one key-chord can be recorded."
   nil)
 
 (defun serialize-key-chord (key-chord &key normalize)
-  ;; TODO: Make use of keycode?
-  ;; TODO: Case opposite to Caps-Lock status?
   "When NORMALIZE is non-nil, remove the shift modifier and upcase the keys."
   (let ((modifiers (copy-list (key-chord-modifiers key-chord))))
     (when (and normalize
@@ -55,12 +84,10 @@ sequence of keys longer than one key-chord can be recorded."
   (mapcar (lambda (k) (serialize-key-chord k :normalize normalize))
           key-chord-stack))
 
-;; TODO: Ideally, we wouldn't need the serialized intermediary representation
-;; and we could remove this function altogether.
 (defun stringify (serialized-key-stack)
   "Return string representation of a serialized key-chord stack.
-E.g. print ((nil - C) (nil x C)) as \"C-x C--\".
-This is effectively the inverse of `serialize-key-chord-stack'."
+   E.g. print ((nil - C) (nil x C)) as 'C-x C--'. This is
+   effectively the inverse of `serialize-key-chord-stack'."
   (format nil "~{~a~^ ~}"
           (mapcar (lambda (serialized-key-chord)
                     (format nil "~{~a~^-~}"
@@ -99,24 +126,13 @@ This is effectively the inverse of `serialize-key-chord-stack'."
 (declaim (ftype (function (key-chord) boolean) printable-p))
 (defun printable-p (key-chord)
   "Return non-nil if key-chord is printable.
-Letters are printable, while function keys or backspace are not."
-  ;; See INPUT_IS_PRINTABLE in platform port.
-  (= -2 (second (key-chord-position key-chord))))
+   Letters are printable, while function keys or backspace are not."
+  ;; TODO: Implement printable-p?
+  (declare (ignore key-chord))
+  t)
 
-;; "Add a new key chord to the interface key-chord-stack.
-;; For example, it may add C-M-s or C-x to a stack which will be consumed by
-;; `consume-key-sequence'."
-(dbus:define-dbus-method (core-object push-input-event)
-    ((key-code :int32) (key-string :string) (modifiers (:array :string))
-     (x :double) (y :double)
-     (low-level-data :int32) (sender :string))
-    ()
-  (:interface +core-interface+)
-  (:name "push_input_event")
-  (%%push-input-event key-code key-string modifiers x y low-level-data sender)
-  (values))
-
-(defun %%push-input-event (key-code key-string modifiers x y low-level-data sender)
+(defun push-input-event (key-code key-string modifiers x y low-level-data sender)
+  "Add a new key chord to the browser key-chord-stack."
   (let ((key-chord (make-key-chord
                     :key-code key-code
                     :key-string key-string
@@ -124,67 +140,53 @@ Letters are printable, while function keys or backspace are not."
                     :modifiers (when (listp modifiers)
                                  (sort modifiers #'string-lessp))
                     :low-level-data low-level-data)))
-    ;; Don't stack the release key-chords or else pressing "C-x" then "C-+""
-    ;; will be understood as "C-x C-R-x C-+ C-R-+".
     (log:debug key-chord)
-    (when (or (null (key-chord-stack *interface*))
-              (not (member-string "R" (key-chord-modifiers key-chord))))
-      (push key-chord (key-chord-stack *interface*))
-      (let* ((active-window (gethash sender (windows *interface*)))
-             (active-buffer (active-buffer active-window))
-             (bound-function (look-up-key-chord-stack active-window
-                                                      (key-chord-stack *interface*))))
-        (when active-buffer
-          (setf (last-key-chords active-buffer) (list key-chord)))
-        (cond
-          ;; prefix binding
-          ((eq bound-function #'prefix)
-           (log:debug "Prefix binding"))
-          ;; function bound
-          ((functionp bound-function)
-           (log:debug "Key sequence ~a bound to:"
-                      (serialize-key-chord-stack (key-chord-stack *interface*)))
-           (funcall bound-function)
-           (setf (key-chord-stack *interface*) nil))
-          ;; minibuffer is active
-          ((active-minibuffers active-window)
-           (if (member-string "R" (key-chord-modifiers (first (key-chord-stack *interface*))))
-               (progn
-                 ;; (log:debug "Key released") ; TODO: This makes the debug trace too verbose.  Middle ground?
-                 nil)
-               (when (printable-p (first (key-chord-stack *interface*)))
-                 (log:debug "Insert ~s in minibuffer" (key-chord-key-string
-                                                       (first (key-chord-stack *interface*))))
-                 (insert (key-chord-key-string (first (key-chord-stack *interface*))))))
-           (setf (key-chord-stack *interface*) nil))
-          ;; forward back to the platform port
-          ((or (and active-buffer (forward-input-events-p active-buffer))
-               (pointer-event-p key-chord))
-           ;; forward-input-events-p is NIL in VI normal mode so that we don't
-           ;; forward unbound keys, unless it's a pointer (mouse) event.
-           ;; TODO: Remove this special case and bind button1 to "self-insert" instead?
-           (rpc-generate-input-event
-                                     active-window
-                                     key-chord)
-           (setf (key-chord-stack *interface*) nil))
-          (t (setf (key-chord-stack *interface*) nil)))))))
+    (push key-chord (key-chord-stack *browser*))
+    (let* ((active-buffer (active-buffer sender))
+           (bound-function (look-up-key-chord-stack sender (key-chord-stack *browser*))))
+      (when active-buffer
+        (setf (last-key-chords active-buffer) (list key-chord)))
+      (cond
+        ;; prefix binding
+        ((eq bound-function #'prefix)
+         (log:debug "Prefix binding"))
+        ;; function bound
+        ((functionp bound-function)
+         (log:debug "Key sequence ~a bound to:"
+                    (serialize-key-chord-stack (key-chord-stack *browser*)))
+         (funcall bound-function)
+         (setf (key-chord-stack *browser*) nil)
+         t) ; return t to avoid further propagation
+        ;; minibuffer is active
+        ((active-minibuffers sender)
+         (when (printable-p (first (key-chord-stack *browser*)))
+           (log:debug "Insert ~s in minibuffer" (key-chord-key-string
+                                                 (first (key-chord-stack *browser*))))
+           (insert (key-chord-key-string (first (key-chord-stack *browser*)))))
+         (setf (key-chord-stack *browser*) nil)
+         t) ; return t to avoid further propagation
+        ((or (and active-buffer (forward-input-events-p active-buffer))
+             (pointer-event-p key-chord))
+         ;; return nil to continue propagation
+         (setf (key-chord-stack *browser*) nil))
+        (t (setf (key-chord-stack *browser*) nil))))))
 
-(declaim (ftype (function (&rest t &key (:scheme list) (:keymap keymap) &allow-other-keys)) define-key))
+;; (declaim (ftype (function (&rest t &key (:scheme list) (:keymap keymap) &allow-other-keys)) define-key)) ; TODO: This fails with Guix.
 @export
 (defun define-key (&rest key-command-pairs
                    &key keymap
                      (scheme :emacs) ; TODO: Deprecated, remove after some version.
                      ;; We need `&allow-other-keys' so that the `:keymap' key
-                     ;; can preceed the list of keys.
+                     ;; can precede the list of keys.
                    &allow-other-keys)
   ;; TODO: Add option to define-key over the keymaps of all instantiated modes.
   "Bind KEY to COMMAND.
-The KEY command transforms key chord strings to valid key sequences.
+   The KEY command transforms key chord strings to valid key sequences.
 
-Examples:
+   Examples:
 
   ;; Only affect the first mode of the current buffer:
-  (define-key \"C-c C-c\" 'reload
+  (define-key 'C-c C-c' 'reload
               :keymap (getf (keymap-schemes (first (modes (current-buffer)))) :emacs))"
   ;; SBCL complains if we modify KEY-COMMAND-PAIRS directly, so we work on a copy.
   (let ((key-command-pairs-copy (copy-list key-command-pairs)))
@@ -217,16 +219,16 @@ Examples:
 
 (defun key (key-sequence-string)
   "Turn KEY-SEQUENCE-STRING into a sequence of serialized key-chords.
-The return value is a list of strings.  The KEY-SEQUENCE-STRING is in the form
-of \"C-x C-s\".
-
-Firstly, we break it apart into chords: \"C-x\" and \"C-s\".  Then, we break
-apart the chords into individual keys.  We use those individual keys to create a
-`key' struct that describes the chord.  We now have two `key's.  We connect
-these two keys in a list in reverse (<key C-s> <key C-x>) to
-match (key-chord-stack *interface*).
-
-This can serve as the key in the keymap."
+   The return value is a list of strings.  The KEY-SEQUENCE-STRING is in the form
+   of 'C-x C-s'.
+   
+   Firstly, we break it apart into chords: 'C-x' and 'C-s'.  Then, we break
+   apart the chords into individual keys.  We use those individual keys to create a
+   `key' struct that describes the chord.  We now have two `key's.  We connect
+   these two keys in a list in reverse (<key C-s> <key C-x>) to
+   match (key-chord-stack *browser*).
+   
+   This can serve as the key in the keymap."
   (serialize-key-chord-stack
    (nreverse
     ;; Iterate through all key chords (space delimited)

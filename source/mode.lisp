@@ -109,7 +109,7 @@ It is run before the destructor.")
                  :documentation "This hook is run when disabling the mode.
 It takes the mode as argument.
 It is run before the destructor.")
-   (keymap-schemes :accessor keymap-schemes :initarg :keymap-schemes :type :list
+   (keymap-schemes :accessor keymap-schemes :initarg :keymap-schemes :type list
                    :initform
                    (let ((vi-map (make-keymap))
                          (emacs-map (make-keymap)))
@@ -207,7 +207,7 @@ It may be MODE-SYMBOL itself."
   "Return first buffer matching MODE-SYMBOL."
   (find-if (lambda (b)
              (find-mode b mode-symbol))
-           (alexandria:hash-table-values (buffers *interface*))))
+           (buffer-list)))
 
 (defmethod keymap ((mode root-mode))
   "Return the keymap of MODE according to its buffer keymap scheme.

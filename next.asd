@@ -1,12 +1,8 @@
-;;; -*- Mode: Lisp; Syntax: ANSI-Common-Lisp; Base: 10 -*-
-;;; next.asd
-
 (asdf:defsystem :next
-  :version "1.4.0"
+  :version "1.5.0"
   :author "Atlas Engineer LLC"
   :license "BSD 3-Clause"
   :serial t
-  :defsystem-depends-on ("trivial-features")
   :depends-on (:alexandria
                :bordeaux-threads
                :cl-annot
@@ -18,8 +14,10 @@
                :cl-ppcre-unicode
                :cl-prevalence
                :closer-mop
-               :dbus
+               :cl-cffi-gtk
+               :cl-webkit2
                :dexador
+               :iolib
                :ironclad
                :local-time
                :log4cl
@@ -44,8 +42,8 @@
                :next/hooks)
   :components ((:module "source"
                 :components
-                ((:file "patch-annot")
-                 (:file "patch-serialization")
+                ((:file "patches/patch-annot")
+                 (:file "patches/patch-serialization")
                  ;; Independent utilities
                  (:file "package")
                  (:file "tags")
@@ -56,8 +54,8 @@
                  ;; Core Functionality
                  (:file "macro")
                  (:file "global")
-                 (:file "port")
-                 (:file "remote")
+                 (:file "browser")
+                 (:file "interprocess-communication-gtk")
                  (:file "command")
                  (:file "mode")
                  (:file "utility")
@@ -89,9 +87,6 @@
                  (:file "download-mode")
                  (:file "vcs-mode")
                  (:file "video-mode")
-                 ;; Port Compatibility Layers
-                 (:file "ports/pyqt-webengine" :if-feature :darwin)
-                 (:file "ports/gtk-webkit" :if-feature (:and :unix (:not :darwin)))
                  ;; Depends on everything else:
                  (:file "about")
                  (:file "session")
@@ -156,7 +151,6 @@
 (asdf:defsystem next/password-manager
   :depends-on (bordeaux-threads
                cl-ppcre
-               cl-annot
                str
                trivial-clipboard
                uiop)

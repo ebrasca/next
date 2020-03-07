@@ -102,6 +102,9 @@ character-preview-count)))."
    (multi-buffer :accessor multi-buffer :initarg :multi-buffer)))
 
 (defmethod object-string ((match match))
+  (body match))
+
+(defmethod object-display ((match match))
   (let* ((id (identifier match))
          (buffer-id (id (buffer match))))
     (if (multi-buffer match)
@@ -190,7 +193,7 @@ provided buffers."
                            :scroll subsequent-call)
                           (setf subsequent-call t)))
                       :cleanup-function (lambda () (remove-focus))
-                      :history (minibuffer-search-history *interface*)))
+                      :history (minibuffer-search-history *browser*)))
          (keymap-scheme (current-keymap-scheme minibuffer))
          (keymap (getf (keymap-schemes (first (modes minibuffer)))
                        keymap-scheme)))
@@ -204,13 +207,3 @@ provided buffers."
 (define-command remove-search-hints ()
   "Remove all search hints."
   (%remove-search-hints))
-
-(define-deprecated-command next-search-hint ()
-  "Go to next search hint.")
-
-(define-deprecated-command previous-search-hint ()
-  "Go to previous search hint.")
-
-(define-deprecated-command add-search-hints ()
-  "Deprecated by `search-buffer'."
-  (search-buffer))

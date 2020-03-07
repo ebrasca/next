@@ -37,6 +37,8 @@
         "C-p" #'scroll-up
         "C-n" #'scroll-down
         "C-x C-=" #'zoom-in-page
+        "C-x s-+" #'zoom-in-page
+        "C-x C-s-+" #'zoom-in-page
         "C-x C-+" #'zoom-in-page
         "C-x +" #'zoom-in-page
         "C-x C-HYPHEN" #'zoom-out-page
@@ -50,8 +52,6 @@
         "C-m C-s" #'bookmark-page
         "C-m g" #'bookmark-hint
         "C-s s" #'search-buffer
-        "C-s n" #'next-search-hint
-        "C-s p" #'previous-search-hint
         "C-s k" #'remove-search-hints
         "C-." #'jump-to-heading
         "M-s->" #'scroll-to-bottom
@@ -130,8 +130,6 @@
         "y t" #'copy-title
         "g h" #'jump-to-heading         ; TODO: VI binding for this?
         "/" #'search-buffer
-        "n" #'next-search-hint
-        "N" #'previous-search-hint
         "?" #'remove-search-hints
         "G" #'scroll-to-bottom
         "g g" #'scroll-to-top
@@ -280,7 +278,7 @@ Otherwise go forward to the only child."
                         ((guard l l) l))))))
     (let* ((buffer-name (format nil "*History-~a*" (id buffer)))
            (output-buffer (or (find-if (lambda (b) (string= buffer-name (title b)))
-                                       (alexandria:hash-table-values (buffers *interface*)))
+                                       (buffer-list))
                               (help-mode :activate t :buffer (make-buffer :title buffer-name))))
            (history (history (find-submode buffer 'web-mode)))
            (tree (traverse (htree:root history)
@@ -290,7 +288,7 @@ Otherwise go forward to the only child."
                      tree))
            (insert-content (ps:ps (setf (ps:@ document Body |innerHTML|)
                                         (ps:lisp content)))))
-      (rpc-buffer-evaluate-javascript output-buffer insert-content)
+      (ipc-buffer-evaluate-javascript output-buffer insert-content)
       (set-current-buffer output-buffer))))
 
 (define-command copy-url ()
@@ -303,7 +301,7 @@ Otherwise go forward to the only child."
   (copy-to-clipboard (title (current-buffer)))
   (echo "~a copied to clipboard." (title (current-buffer))))
 
-(define-parenscript %paste ((input-text (ring-insert-clipboard (clipboard-ring *interface*))))
+(define-parenscript %paste ((input-text (ring-insert-clipboard (clipboard-ring *browser*))))
   (let* ((active-element (ps:chain document active-element))
          (start-position (ps:chain active-element selection-start))
          (end-position (ps:chain active-element selection-end)))
@@ -324,11 +322,11 @@ Otherwise go forward to the only child."
       (fuzzy-match input ring-items))))
 
 (define-command paste-from-ring ()
-  "Show `*interface*' clipboard ring and paste selected entry."
+  "Show `*browser*' clipboard ring and paste selected entry."
   (with-result (ring-item (read-from-minibuffer
                            (make-minibuffer
                             :completion-function (ring-completion-filter
-                                                  (clipboard-ring *interface*)))))
+                                                  (clipboard-ring *browser*)))))
     (%paste :input-text ring-item)))
 
 (define-parenscript %copy ()
@@ -337,7 +335,7 @@ Otherwise go forward to the only child."
 
 (defun copy-to-clipboard (input)
   "Save INPUT text to clipboard, and ring."
-  (ring:insert (clipboard-ring *interface*) (trivial-clipboard:text input)))
+  (ring:insert (clipboard-ring *browser*) (trivial-clipboard:text input)))
 
 (define-command copy ()
   "Copy selected text to clipboard."
@@ -351,7 +349,7 @@ Otherwise go forward to the only child."
   (echo "Loading: ~a." url))
 
 (defmethod did-finish-navigation ((mode next/web-mode::web-mode) url)
-  (let* ((active-window (rpc-window-active))
+  (let* ((active-window (ipc-window-active *browser*))
          (buffer (active-buffer active-window)))
     ;; TODO: Setting the default zoom level works with pure Javascript, but it
     ;; can only be done after the URL has been loaded which is a bit of a
@@ -366,11 +364,11 @@ Otherwise go forward to the only child."
                      :test #'equals)
     (when url
       (history-add url :title (title buffer)))
-    (match (session-store-function *interface*)
+    (match (session-store-function *browser*)
       ((guard f f) (funcall f))))
   (echo "Finished loading: ~a." url)
   ;; TODO: Wait some time before dismissing the minibuffer.
   (echo-dismiss))
 
 (defmethod object-string ((node htree:node))
-  (format nil "~a" (object-string (when node (htree:data node)))))
+  (object-string (when node (htree:data node))))

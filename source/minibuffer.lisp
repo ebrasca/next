@@ -75,21 +75,24 @@
                   :initform '(minibuffer-mode))
    (completion-function :initarg :completion-function :accessor completion-function
                         :initform nil
-                        :documentation "Function that takes the user input
-string and returns a list of candidate strings")
+                        :documentation "Function that takes the user
+                        input string and returns a list of candidate
+                        strings")
    (callback :initarg :callback :accessor callback
              :initform nil
              :documentation "Function to call over the selected candidate.")
    (callback-buffer :initarg :callback-buffer
                     :accessor callback-buffer
-                    :initform (when *interface* (current-buffer))
-                    :documentation "The active buffer when the minibuffer was
-brought up.  This can be useful to know which was the original buffer in the
-`callback' in case the buffer was changed.")
+                    :initform (when *browser* (current-buffer))
+                    :documentation "The active buffer when the
+                    minibuffer was brought up.  This can be useful to
+                    know which was the original buffer in the
+                    `callback' in case the buffer was changed.")
    (setup-function :initarg :setup-function :accessor setup-function
                    :initform #'setup-default
-                   :documentation "Function of no argument that fills the
-`content' on when the minibuffer is created.  Called only once.")
+                   :documentation "Function of no argument that fills
+                   the `content' on when the minibuffer is created.
+                   Called only once.")
    (cleanup-function :initarg :cleanup-function :accessor cleanup-function
                      :initform nil
                      :documentation "Function run after a completion has been selected.
@@ -100,9 +103,8 @@ This should not rely on the minibuffer's content.")
                      :documentation "Function to call whenever a change happens.")
    (empty-complete-immediate :initarg :empty-complete-immediate :accessor empty-complete-immediate ; TODO: Rename?
                              :initform nil
-                             :documentation "If non-nil, allow input matching no)))
-candidates.")
-   ;; TODO: Move input-* slots to a separate text class?
+                             :documentation "If non-nil, allow input
+                             matching no candidates.")
    (input-prompt :initarg :input-prompt :accessor input-prompt :initform "Input"
                  :type string)
    (input-buffer :initarg :input-buffer :accessor input-buffer :initform ""
@@ -112,25 +114,28 @@ candidates.")
    (invisible-input-p :initarg :invisible-input-p :accessor invisible-input-p
                       :initform nil
                       :documentation "If non-nil, input is replaced by
-placeholder character.  This is useful to conceal passwords.")
+                      placeholder character.  This is useful to
+                      conceal passwords.")
    (history :initarg :history :accessor history
-            :initform (minibuffer-generic-history *interface*)
+            :initform (minibuffer-generic-history *browser*)
             :type ring:ring
-            :documentation "History of inputs for the minibuffer.
-If nil, no history is used.")
+            :documentation "History of inputs for the minibuffer. If
+            nil, no history is used.")
    (multi-selection-p :initarg :multi-selection-p :accessor multi-selection-p
                       :initform nil
                       :type boolean
-                      :documentation "If non-nil, allow for selecting multiple
-candidates.")
+                      :documentation "If non-nil, allow for selecting
+                      multiple candidates.")
    (completions :accessor completions :initform nil)
    (marked-completions :accessor marked-completions :initform nil)
    (show-completion-count :accessor show-completion-count
                           :initarg :show-completion-count :initform t
                           :type boolean
-                          :documentation "Show the number of chosen candidates inside brackets. In the case of yes/no questions, there is no need for it.")
+                          :documentation "Show the number of chosen
+                          candidates inside brackets. In the case of
+                          yes/no questions, there is no need for it.")
    (completion-head :accessor completion-head :initform 0)
-   (completion-cursor :accessor completion-cursor :initform 0) ; TODO: Rename to completion-index?
+   (completion-cursor :accessor completion-cursor :initform 0)
    (content :initform "" :type string
             :documentation "The HTML content of the minibuffer.")
    (max-lines :initarg :max-lines
@@ -138,22 +143,25 @@ candidates.")
               :type integer
               :initform 10
               :documentation "Max number of candidate lines to show.
-You will want edit this to match the changes done to `minibuffer-font-size',
-`minibuffer-line-height' and `minibuffer-open-height'.")
+              You will want edit this to match the changes done to
+              `minibuffer-font-size', `minibuffer-line-height' and
+              `minibuffer-open-height'.")
    (minibuffer-font-size :initarg :minibuffer-font-size
                          :accessor minibuffer-font-size
                          :type string
                          :initform "1em"
-                         :documentation "CSS font size for the minibuffer.
-Value is a string, e.g. '1em'.
-You might want to configure the value on HiDPI screen.")
+                         :documentation "CSS font size for the
+                         minibuffer.  Value is a string, e.g. '1em'.
+                         You might want to configure the value on
+                         HiDPI screen.")
    (minibuffer-line-height :initarg :minibuffer-line-height
                            :accessor minibuffer-line-height
                            :type string
                            :initform ""
-                           :documentation "CSS line height for the minibuffer.
-Value is a string, e.g. '1em'.
-You might want to configure the value on HiDPI screen.")
+                           :documentation "CSS line height for the
+                           minibuffer.  Value is a string, e.g. '1em'.
+                           You might want to configure the value on
+                           HiDPI screen.")
    (minibuffer-style :accessor minibuffer-style
                      :initform (cl-css:css
                                 '((* :font-family "monospace,monospace")
@@ -179,9 +187,6 @@ You might want to configure the value on HiDPI screen.")
                                   (.marked :background-color "darkgray"
                                            :font-weight "bold"
                                            :color "white")
-                                  ;; .selected must be set _after_ .marked so
-                                  ;; that it overrides its attributes since the
-                                  ;; candidate can be both marked and selected.
                                   (.selected :background-color "gray"
                                              :color "white")))
                      :documentation "The CSS applied to a minibuffer when it is set-up.")))
@@ -251,8 +256,8 @@ You might want to configure the value on HiDPI screen.")
 
 (defmethod (setf input-buffer) (value (minibuffer minibuffer))
   "Reset the minibuffer state on every input change.
-This is necessary or else completion cursor / head could be beyond the updated
-list length."
+  This is necessary or else completion cursor / head could be beyond
+  the updated list length."
   (with-slots (completion-function completions input-buffer
                empty-complete-immediate completion-cursor completion-head)
       minibuffer
@@ -278,15 +283,15 @@ list length."
 
 (defmethod (setf content) (html-content minibuffer)
   "Set the `content' of the MINIBUFFER to HTML-CONTENT.
-This runs a call"
+   This runs a call"
   (setf (slot-value minibuffer 'content) html-content)
-  (rpc-minibuffer-evaluate-javascript
-   (last-active-window *interface*)
+  (ipc-minibuffer-evaluate-javascript
+   (last-active-window *browser*)
    (ps:ps (ps:chain document
                     (write (ps:lisp (content minibuffer)))))))
 
 (defmethod initialize-instance :after ((minibuffer minibuffer) &key)
-  (next-hooks:run-hook (minibuffer-make-hook *interface*) minibuffer)
+  (next-hooks:run-hook (minibuffer-make-hook *browser*) minibuffer)
   ;; We don't want to show the input in the candidate list when invisible.
   (unless (completion-function minibuffer)
     ;; If we have no completion function, then we have no candidates beside
@@ -302,13 +307,13 @@ This runs a call"
 @export
 (defun read-from-minibuffer (minibuffer &key callback)
   "Open the minibuffer, ready for user input.
-Example use:
+   Example use:
 
-  (read-from-minibuffer
-   (make-minibuffer
-    :completion-function #'my-completion-filter))
+   (read-from-minibuffer
+    (make-minibuffer
+     :completion-function #'my-completion-filter))
 
-See the documentation of `minibuffer' to know more about the minibuffer options."
+   See the documentation of `minibuffer' to know more about the minibuffer options."
   (when callback
     ;; We need a :callback key argument so that `read-from-minibuffer' can be
     ;; called in `with-result'.
@@ -324,11 +329,11 @@ See the documentation of `minibuffer' to know more about the minibuffer options.
     (error (c)
       (echo "~a" c)
       (return-from read-from-minibuffer)))
-  (push minibuffer (active-minibuffers (last-active-window *interface*)))
+  (push minibuffer (active-minibuffers (last-active-window *browser*)))
   (apply #'show
          (unless (completion-function minibuffer)
            ;; We don't need so much height since there is no candidate to display.
-           (list :height (status-buffer-height (last-active-window *interface*))))))
+           (list :height (status-buffer-height (last-active-window *browser*))))))
 
 (define-command return-input (&optional (minibuffer (current-minibuffer)))
   "Return with minibuffer selection."
@@ -405,9 +410,9 @@ See the documentation of `minibuffer' to know more about the minibuffer options.
 (defmethod evaluate-script ((minibuffer minibuffer) script)
   "Evaluate SCRIPT into MINIBUFFER's webview.
 The new webview HTML content it set as the MINIBUFFER's `content'."
-  (let ((active-window (rpc-window-active)))
+  (let ((active-window (ipc-window-active *browser*)))
     (when minibuffer
-      (with-result (new-content (rpc-minibuffer-evaluate-javascript
+      (with-result (new-content (ipc-minibuffer-evaluate-javascript
                                  active-window
                                  (str:concat
                                   script
@@ -419,19 +424,19 @@ The new webview HTML content it set as the MINIBUFFER's `content'."
 
 (defun show (&key
              (minibuffer (first (active-minibuffers
-                                 (last-active-window *interface*))))
+                                 (last-active-window *browser*))))
              height)
   "Show the last active minibuffer, if any."
-  (let ((active-window (last-active-window *interface*)))
+  (let ((active-window (last-active-window *browser*)))
     (when minibuffer
-      (rpc-window-set-minibuffer-height
+      (ipc-window-set-minibuffer-height
        active-window
        (or height
            (minibuffer-open-height active-window))))))
 
 (defun hide (minibuffer)
   "Hide MINIBUFFER and display next active one, if any."
-  (let ((active-window (rpc-window-active)))
+  (let ((active-window (ipc-window-active *browser*)))
     ;; Note that MINIBUFFER is not necessarily first in the list, e.g. a new
     ;; minibuffer was invoked before the old one reaches here.
     (setf (active-minibuffers active-window)
@@ -446,7 +451,7 @@ The new webview HTML content it set as the MINIBUFFER's `content'."
           ;; TODO: We need a mode-line before we can afford to really hide the
           ;; minibuffer.  Until then, we "blank" it.
           (echo "")                     ; Or echo-dismiss?
-          (rpc-window-set-minibuffer-height
+          (ipc-window-set-minibuffer-height
            active-window
            ;; TODO: Until we have a mode-line, it's best to keep the
            ;; closed-height equal to the echo-height to avoid the stuttering,
@@ -464,7 +469,7 @@ The new webview HTML content it set as the MINIBUFFER's `content'."
 
 (define-command self-insert ()
   "Insert key-chord-stack in MINIBUFFER."
-  (let ((key-string (key-chord-key-string (first (key-chord-stack *interface*))))
+  (let ((key-string (key-chord-key-string (first (key-chord-stack *browser*))))
         (translation-table '(("HYPHEN" "-")
                              ;; Regular spaces are concatenated into a single
                              ;; one by HTML rendering, so we use a non-breaking
@@ -564,12 +569,10 @@ The new webview HTML content it set as the MINIBUFFER's `content'."
            ;; In the minibuffer, the cursor is actually one position *after* the last char.
            (word-separation-character-p (char-at-position input
                                                           (max 0 (1- position))))))
-
     ;; Move past all delimiters at the end of input.
     (loop while (and (ahead-delimiter-p input position)
                      (plusp position))
        do (decf position))
-
     ;; Move past one word.
     (loop while (and (not (ahead-delimiter-p input position))
                      (plusp position))
@@ -680,7 +683,7 @@ The new webview HTML content it set as the MINIBUFFER's `content'."
                                              ((= i cursor-index) "selected")
                                              ((member completion (marked-completions minibuffer)) "marked")
                                              ((= i (completion-head minibuffer)) "head"))
-                                       (match (object-string completion)
+                                       (match (object-display completion)
                                          ((guard s (not (str:emptyp s))) s)
                                          (_ " ")))))))))
 
@@ -768,7 +771,7 @@ if there is one such."
                           ;; Need to ignore RPC errors in case platform port is
                           ;; not available and we use this function before
                           ;; checking for it.
-                            (window (ignore-errors (when *interface* (rpc-window-active))))
+                            (window (ignore-errors (when *browser* (ipc-window-active *browser*))))
                             (status-buffer (when window (status-buffer window))))
   "Echo TEXT in the status buffer.
 MESSAGE is a cl-markup list."
@@ -784,7 +787,7 @@ MESSAGE is a cl-markup list."
                          "]")
                      " "
                      ,@message)
-                (messages-content *interface*)))
+                (messages-content *browser*)))
         (unless (active-minibuffers window)
           (erase-document status-buffer)
           (let ((style (cl-css:css
@@ -869,7 +872,7 @@ Return most recent entry in RING."
 
 (define-command minibuffer-paste (&optional (minibuffer (current-minibuffer)))
   "Paste clipboard text to input."
-  (insert (ring-insert-clipboard (clipboard-ring *interface*)) minibuffer))
+  (insert (ring-insert-clipboard (clipboard-ring *browser*)) minibuffer))
 
 @export
 (defmethod get-candidate ((minibuffer minibuffer))
@@ -895,18 +898,9 @@ Return most recent entry in RING."
 (define-command insert-candidate (&optional (minibuffer (current-minibuffer)))
   "Paste clipboard text to input."
   (let ((candidate (get-candidate minibuffer)))
-    (cond
-      ;; Complete a search engine name.
-      ((and candidate
-            (zerop (completion-cursor minibuffer)))
-       (let ((name (search-engine-starting-with candidate)))
-         (when name
-           (kill-whole-line minibuffer)
-           (insert (str:concat name " ")))))
-      (t
-       (when candidate
-         (kill-whole-line minibuffer)
-         (insert candidate minibuffer))))))
+    (when candidate
+      (kill-whole-line minibuffer)
+      (insert candidate minibuffer))))
 
 (declaim (ftype (function (ring:ring)) minibuffer-history-completion-filter))
 (defun minibuffer-history-completion-filter (history)

@@ -8,6 +8,10 @@
 (defmethod object-string ((object t))
   (princ-to-string object))
 
+(defmethod object-display ((object t))
+  "Text shown by completion candidates in the minibuffer."
+  (object-string object))
+
 (defmethod object-string ((package package))
   (if (eq (package-name package) (find-package :next))
       ""
@@ -166,3 +170,13 @@ won't be affected."
      (let ((exit-code (uiop:wait-process
                        (uiop:launch-program command))))
        (notify (if (zerop exit-code) success-msg error-msg))))))
+
+(defmethod write-output-to-log ((browser browser))
+  "Set the *standard-output* and *error-output* to write to a log file."
+  (values
+   (setf *standard-output*
+         (open (standard-output-path browser) :direction :output
+                                                :if-does-not-exist :create :if-exists :append))
+   (setf *error-output*
+         (open (error-output-path browser) :direction :output :if-does-not-exist :create
+                                             :if-exists :append))))

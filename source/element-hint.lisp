@@ -1,6 +1,5 @@
 ;;; element-hint.lisp --- functions to enable link hinting and
-;;; navigation. This file's original parenscript is licensed under
-;;; license documents/external/LICENSE1
+;;; navigation.
 
 (in-package :next)
 
@@ -194,9 +193,15 @@ identifier for every hinted element."
   ((url :accessor url :initarg :url)))
 
 (defmethod object-string ((link-hint link-hint))
+  (url link-hint))
+
+(defmethod object-display ((link-hint link-hint))
   (format nil "~a  ~a  ~a" (hint link-hint) (body link-hint) (url link-hint)))
 
 (defmethod object-string ((button-hint button-hint))
+  (body button-hint))
+
+(defmethod object-display ((button-hint button-hint))
   (format nil "~a  ~a  Button" (hint button-hint) (body button-hint)))
 
 (defmethod %follow-hint ((link-hint link-hint))
@@ -275,19 +280,3 @@ visible active buffer."
 (define-command copy-hint-url ()
   "Show a set of element hints, and copy the URL of the user inputted one."
   (query-hints "Copy element URL:" '%copy-hint-url)) 
-
-(define-deprecated-command copy-anchor-url ()
-  "Deprecated by `copy-hint-url'."
-  (copy-hint-url))
-
-(define-deprecated-command go-anchor ()
-  "Deprecated by `follow-hint'."
-  (follow-hint))
-
-(define-deprecated-command go-anchor-new-buffer-focus ()
-  "Deprecated by `follow-hint-new-buffer-focus'."
-  (follow-hint-new-buffer-focus))
-
-(define-deprecated-command go-anchor-new-buffer ()
-  "Deprecated by `follow-hint-new-buffer'."
-  (follow-hint-new-buffer))

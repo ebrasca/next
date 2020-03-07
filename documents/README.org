@@ -1,14 +1,15 @@
 * Next Developer Readme                                                 :TOC:
 - [[#developer-installation-with-guix][Developer Installation with Guix]]
+  - [[#run-from-source][Run from source]]
 - [[#generic-developer-installation][Generic Developer Installation]]
   - [[#installing-sbcl][Installing SBCL]]
   - [[#installing-quicklisp-optional][Installing Quicklisp (optional)]]
   - [[#gnulinux-specific-dependencies][GNU/Linux specific dependencies]]
   - [[#macos-specific-dependencies][macOS specific dependencies]]
+  - [[#lisp-specific-dependencies][Lisp specific dependencies]]
   - [[#fetch-the-source-code][Fetch the source code]]
   - [[#compile][Compile]]
-  - [[#run][Run]]
-  - [[#run-from-source][Run from Source]]
+  - [[#run-from-source-1][Run from Source]]
   - [[#update-local-lisp-libraries][Update local Lisp libraries]]
 - [[#help--community][Help & Community]]
   - [[#learning-common-lisp][Learning Common Lisp]]
@@ -39,15 +40,12 @@ Next is written in Common Lisp. It can be built with any standard
 Common Lisp implementation. Currently, only [[http://www.sbcl.org/][SBCL]] (≥ 1.4.2) support is tested.
 
 It is designed to be cross-platform, cross-engine compatible. Next is
-available in both WebKit and WebEngine flavors. Support for graphics
-and OS integration is provided via:
+available in both WebKit and WebEngine flavors (WebEngine flavor is
+currently under re-development). Support for graphics and OS
+integration is provided via:
 
-+ macOS: Qt
-+ GNU/Linux: Qt or GTK
-
-Note that we provide a Debian package,  for Debian >= 10 (Sid) and its
-derivatives  (Ubuntu,  Linux  Mint…).  See  our  [[https://next.atlas.engineer/download][Downloads  page]].  The
-following instructions assume you want to install Next from source.
++ macOS: GTK
++ GNU/Linux: GTK
 
 ** Installing SBCL
 
@@ -89,7 +87,12 @@ The full list of dependencies can be installed in a one-liner:
 
 - Debian-based distributions:
   #+begin_src sh
-  sudo apt install sbcl libwebkit2gtk-4.0-dev default-dbus-session-bus glib-networking sqlite gsettings-desktop-schemas libfixposix-dev libgstreamer1.0-0 gir1.2-gst-plugins-base-1.0 xclip notify-osd
+  sudo apt install sbcl libwebkit2gtk-4.0-dev glib-networking sqlite gsettings-desktop-schemas libfixposix-dev libgstreamer1.0-0 gir1.2-gst-plugins-base-1.0 xclip notify-osd
+  #+end_src
+
+- Fedora:
+  #+begin_src sh
+  sudo dnf install sbcl webkit2gtk3-devel glib-networking sqlite gsettings-desktop-schemas libfixposix-devel gstreamer1-devel gstreamer1-plugins-base xclip   
   #+end_src
 
 If your distribution does not install libraries in an [[https://en.wikipedia.org/wiki/Filesystem_Hierarchy_Standard][FHS]]-expected location, you
@@ -128,12 +131,17 @@ these fixes.
 #+end_quote
 
 ** macOS specific dependencies
-+ Qt
-+ D-Bus
-+ [[https://github.com/sionescu/libfixposix][libfixposix]]
-+ PyQt
-+ Python 3.6
++ WebKitGTK+
++ XQuartz
 + SQLite (available by default)
+
+** Lisp specific dependencies
+Clone the cl-webkit repository into =~/common-lisp= or any directory
+listed in ~asdf:*central-registry*~:
+
+#+begin_src sh
+git clone https://github.com/atlas-engineer/cl-webkit ~/common-lisp/cl-webkit
+#+end_src
 
 ** Fetch the source code
 Clone the Next repository into =~/common-lisp= or any directory listed in
@@ -142,7 +150,6 @@ Clone the Next repository into =~/common-lisp= or any directory listed in
 #+begin_src sh
 git clone https://github.com/atlas-engineer/next ~/common-lisp/next
 #+end_src
-
 ** Compile
 Next consists of two standalone executables: the Lisp core and the
 platform port. There are two ways to build Next depending on if
@@ -152,10 +159,7 @@ you want to use [[https://github.com/roswell/roswell][Roswell]].
 
 The following command will build both Lisp core and the platform
 port. On macOS this will produce an application bundle which you can
-copy into your =/Applications= folder. Before you can run Next on
-macOS, you may have to modify the
-=#!/path/to/your/python/installation= at the top of
-=Next.app/Contents/MacOS/next-pyqt-webengine=.
+copy into your =/Applications= folder.
 
 - GNU/Linux:
 #+BEGIN_SRC sh
@@ -200,37 +204,6 @@ make install-gtk-webkit
 You may simply type =make= to display documentation.
 
 Please refer to the next section to make the two parts work together.
-
-** Run
-
-The compilation must have produced two executables:
-
-- =next= in the root folder.
-- A platform port executable in the appropriate =ports/= subfolder.
-
-For =next= to work, it must find the platform port.  There are a few options:
-
-- Either specify the path in your Next config file (=~/.config/next/init.lisp=):
-  #+BEGIN_SRC lisp
-(in-package :next)
-
-;; Use development platform port.
-(setf +platform-port-command+
-      "~/common-lisp/next/ports/gtk-webkit/next-gtk-webkit")
-;; ...
-  #+END_SRC
-
-- Or add the appropriate platform-port folder (e.g. the GTK or Qt
-  platform-port application) to your =$PATH=. For instance you can add
-  #+BEGIN_SRC sh
-  export PATH=$PATH:/path/to/next/ports/gtk-webkit
-  #+END_SRC
-  to your user initialization file.
-
-- Or install the platform-port executable into an well known =$PATH= folder, for
-  instance =/usr/local/bin=.
-
-Now go ahead and start =path/to/next/next=!
 
 ** Run from Source
 

@@ -29,7 +29,7 @@
   (fuzzy-match input (list-commands)))
 
 ;; TODO: This is barely useful as is since we don't have many globals.  We need to
-;; augment the latter function so that we can inspect classes like remote-interface.
+;; augment the latter function so that we can inspect classes like browser.
 (define-command variable-inspect ()
   "Inspect a variable and show it in a help buffer."
   (with-result (input (read-from-minibuffer
@@ -48,7 +48,7 @@
                            (:p (write-to-string (symbol-value input)))))
            (insert-help (ps:ps (setf (ps:@ document Body |innerHTML|)
                                      (ps:lisp help-contents)))))
-      (rpc-buffer-evaluate-javascript help-buffer insert-help)
+      (ipc-buffer-evaluate-javascript help-buffer insert-help)
       (set-current-buffer help-buffer))))
 
 ;; TODO: Have both "function-inspect" and "command-inspect"?
@@ -74,10 +74,12 @@
                            (:p "Source file: "
                                (getf (getf (swank:find-definition-for-thing (command-function input))
                                            :location)
-                                     :file))))
+                                     :file))
+                           (:h2 "Source:")
+                           (:pre (:code (write-to-string (sexp input) )))))
            (insert-help (ps:ps (setf (ps:@ document Body |innerHTML|)
                                      (ps:lisp help-contents)))))
-      (rpc-buffer-evaluate-javascript help-buffer insert-help)
+      (ipc-buffer-evaluate-javascript help-buffer insert-help)
    (set-current-buffer help-buffer))))
 
 (defun evaluate (string)
@@ -109,7 +111,7 @@ This does not use an implicit PROGN to allow evaluating top-level expressions."
                                          collect (cl-markup:markup (:p result)))))
            (insert-results (ps:ps (setf (ps:@ document Body |innerHTML|)
                                         (ps:lisp result-contents)))))
-      (rpc-buffer-evaluate-javascript result-buffer insert-results)
+      (ipc-buffer-evaluate-javascript result-buffer insert-results)
       (set-current-buffer result-buffer))))
 
 (define-command help ()
@@ -176,7 +178,7 @@ This does not use an implicit PROGN to allow evaluating top-level expressions."
 
          (insert-help (ps:ps (setf (ps:@ document Body |innerHTML|)
                                    (ps:lisp help-contents)))))
-      (rpc-buffer-evaluate-javascript help-buffer insert-help)
+      (ipc-buffer-evaluate-javascript help-buffer insert-help)
   (set-current-buffer help-buffer)
     help-buffer))
 
@@ -194,26 +196,26 @@ The version number is stored in the clipboard."
    `(:p ,(with-output-to-string (s)
            (log4cl-impl:layout-to-stream
             (slot-value appender 'log4cl-impl:layout) s logger level log-func)))
-   (messages-content *interface*)))
+   (messages-content *browser*)))
 
 (define-command messages ()
   "Show the *Messages* buffer."
   (let ((buffer (find-if (lambda (b)
                            (string= "*Messages*" (title b)))
-                         (alexandria:hash-table-values (buffers *interface*)))))
+                         (buffer-list))))
     (unless buffer
       (setf buffer (help-mode :activate t :buffer (make-buffer :title "*Messages*"))))
     (let* ((content
              (apply #'cl-markup:markup*
                     '(:h1 "Messages")
-                    (reverse (messages-content *interface*))))
+                    (reverse (messages-content *browser*))))
            (insert-content (ps:ps (setf (ps:@ document body |innerHTML|)
                                         (ps:lisp content)))))
-      (rpc-buffer-evaluate-javascript buffer insert-content))
+      (ipc-buffer-evaluate-javascript buffer insert-content))
     (set-current-buffer buffer)
     buffer))
 
 (define-command clear-messages ()
   "Clear the *Messages* buffer."
-  (setf (messages-content *interface*) '())
+  (setf (messages-content *browser*) '())
   (echo "Messages cleared."))

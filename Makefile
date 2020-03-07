@@ -18,7 +18,7 @@ APPLICATIONSDIR = /Applications
 help:
 	@cat INSTALL
 
-lisp_files := next.asd source/*.lisp source/ports/*.lisp
+lisp_files := next.asd source/*.lisp
 
 .PHONY: clean-fasls
 clean-fasls:
@@ -36,27 +36,16 @@ next: $(lisp_files) clean-fasls quicklisp-update
 	env NEXT_INTERNAL_QUICKLISP=$(NEXT_INTERNAL_QUICKLISP) $(LISP) $(LISP_FLAGS) \
 		--eval '(require "asdf")' \
 		--eval '(when (string= (uiop:getenv "NEXT_INTERNAL_QUICKLISP") "true") (load "$(QUICKLISP_DIR)/setup.lisp"))' \
-		--eval '(ql:quickload :trivial-features)' \
 		--eval '(ql:quickload :prove-asdf)' \
 		--load next.asd \
 		--eval '(asdf:make :next)' \
-		--eval '(uiop:quit)' || (printf "\n%s\n%s\n" "Compilation failed." "Make sure the 'xclip' binary and the 'sqlite' and 'libfixposix' development files are available on your system." && exit 1)
-
-
-.PHONY: debian
-# Install Debian 10 dependencies.
-debian:
-	apt install -y sbcl libwebkit2gtk-4.0-dev default-dbus-session-bus glib-networking sqlite gsettings-desktop-schemas libfixposix-dev libgstreamer1.0-0 gir1.2-gst-plugins-base-1.0 xclip
-
+		--eval '(uiop:quit)' || (printf "\n%s\n%s\n" "Compilation failed." "Make sure the 'xclip' binary and the 'sqlite' files are available on your system." && exit 1)
 
 .PHONY: app-bundle
-app-bundle: next
+app-bundle:
 	mkdir -p ./Next.app/Contents/MacOS
 	mkdir -p ./Next.app/Contents/Resources
 	mv ./next ./Next.app/Contents/MacOS
-	cp -r ./ports/pyqt-webengine/* ./Next.app/Contents/MacOS
-	mv ./Next.app/Contents/MacOS/next-pyqt-webengine.py ./Next.app/Contents/MacOS/next-pyqt-webengine
-	chmod +x ./Next.app/Contents/MacOS/next-pyqt-webengine
 	cp ./assets/Info.plist ./Next.app/Contents
 	cp ./assets/next.icns ./Next.app/Contents/Resources
 
@@ -64,22 +53,14 @@ app-bundle: next
 install-app-bundle:
 	cp -r Next.app $(DESTDIR)/Applications
 
-.PHONY: gtk-webkit
-gtk-webkit:
-	$(MAKE) -C ports/gtk-webkit || (printf "\n%s\n%s\n" "Compilation failed." "Make sure 'webkitgtk >=2.22' development files are available on your system." && exit 1)
-
 .PHONY: all
 all:
 ifeq ($(UNAME), Linux)
-all: next gtk-webkit
+all: next
 endif
 ifeq ($(UNAME), Darwin)
-all: app-bundle
+all: next app-bundle
 endif
-
-.PHONY: install-gtk-webkit
-install-gtk-webkit: gtk-webkit
-	$(MAKE) -C ports/gtk-webkit install DESTDIR=$(DESTDIR) PREFIX=$(PREFIX)
 
 ## We use a temporary "version" file to generate the final next.desktop with the
 ## right version number.  Since "version" is a file target, third-party
@@ -90,12 +71,10 @@ version:
 	env NEXT_INTERNAL_QUICKLISP=$(NEXT_INTERNAL_QUICKLISP) $(LISP) $(LISP_FLAGS) \
 		--eval '(require "asdf")' \
 		--eval '(when (string= (uiop:getenv "NEXT_INTERNAL_QUICKLISP") "true") (load "$(QUICKLISP_DIR)/setup.lisp"))' \
-		--eval '(ql:quickload :trivial-features)' \
 		--eval '(ql:quickload :prove-asdf)' \
 		--load next.asd \
 		--eval '(with-open-file (stream "version" :direction :output :if-exists :supersede) (format stream "~a" (asdf/component:component-version (asdf:find-system :next))))' \
 		--eval '(uiop:quit)'
-
 
 .PHONY: install-assets
 install-assets: version
@@ -117,15 +96,11 @@ install-next: next
 install:
 install:
 ifeq ($(UNAME), Linux)
-install: install-next install-gtk-webkit install-assets
+install: install-next install-assets
 endif
 ifeq ($(UNAME), Darwin)
 install: install-app-bundle
 endif
-
-.PHONY: clean-port
-clean-port:
-	rm -rf build
 
 QUICKLISP_URL = https://beta.quicklisp.org/quicklisp.lisp
 DOWNLOAD_AGENT = curl
@@ -144,12 +119,24 @@ $(QUICKLISP_DIR)/setup.lisp: quicklisp.lisp
 		--eval '(quicklisp-quickstart:install :path "$(QUICKLISP_DIR)/")' \
 		--eval '(uiop:quit)' || true
 
+# TODO: This updated package is not on Quicklisp yet, but once it is we can
+# remove this special rule.
+.PHONY: cl-webkit
+cl-webkit: $(QUICKLISP_DIR)/setup.lisp
+	if $(NEXT_INTERNAL_QUICKLISP); then \
+			[ -e "$(QUICKLISP_DIR)"/local-projects/cl-webkit ] && true || \
+				git clone https://github.com/atlas-engineer/cl-webkit $(QUICKLISP_DIR)/local-projects/cl-webkit ; \
+		else \
+			mkdir -p ~/common-lisp && \
+				[ -e ~/common-lisp/cl-webkit ] && true || \
+				git clone https://github.com/atlas-engineer/cl-webkit ~/common-lisp/cl-webkit ; \
+		fi
+
 .PHONY: deps
-deps: $(QUICKLISP_DIR)/setup.lisp
+deps: $(QUICKLISP_DIR)/setup.lisp cl-webkit
 	$(NEXT_INTERNAL_QUICKLISP) && $(LISP) $(LISP_FLAGS) \
 		--eval '(require "asdf")' \
 		--load $< \
-		--eval '(ql:quickload :trivial-features)' \
 		--eval '(ql:quickload :prove-asdf)' \
 		--load next.asd \
 		--eval '(ql:quickload :next)' \
@@ -166,20 +153,16 @@ quicklisp-update: $(QUICKLISP_DIR)/setup.lisp
 
 ## Testing that next loads is a first test.
 ## TODO: Test that Next starts even with broken init file.
+.PHONY: test
 test: $(lisp_files)
 	$(NEXT_INTERNAL_QUICKLISP) && $(MAKE) deps || true
 	env NEXT_INTERNAL_QUICKLISP=$(NEXT_INTERNAL_QUICKLISP) $(LISP) $(LISP_FLAGS) \
 		--eval '(require "asdf")' \
 		--eval '(when (string= (uiop:getenv "NEXT_INTERNAL_QUICKLISP") "true") (load "$(QUICKLISP_DIR)/setup.lisp"))' \
-		--eval '(ql:quickload :trivial-features)' \
 		--eval '(ql:quickload :prove-asdf)' \
 		--load next.asd \
 		--eval '(ql:quickload :next)' \
 		--eval '(uiop:quit)'
-
-# Usage: make VERSION=1.x.y release
-release:
-	./build-scripts/release.sh $(VERSION)
 
 .PHONY: clean-deps
 clean-deps:
@@ -187,4 +170,4 @@ clean-deps:
 	rm -rf $(QUICKLISP_DIR)
 
 .PHONY: clean
-clean: clean-fasls clean-port clean-deps
+clean: clean-fasls clean-deps

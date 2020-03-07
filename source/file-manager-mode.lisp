@@ -54,23 +54,32 @@ Open any file from within Next, with the usual fuzzy completion.
     (let ((extension (str:downcase (pathname-type filename))))
       (find extension *supported-media-types* :test #'string-equal))))
 
+;; TODO: By default, we should open directories in a new buffer (see NEW-BUFFER-P), and open supported media in a new buffer (see `supported-media').
 @export
-(defun open-file-function (filename &key (new-buffer-p *open-file-in-new-buffer*))
+(defun open-file-function (filename &key ;; (new-buffer-p *open-file-in-new-buffer*)
+                                      )
   "Open FILENAME.
-FILENAME is the full path of the file (or directory), as a string, with no tilde (it would be expanded before).
-By default, open directories in a new buffer (NEW-BUFFER-P), open supported media in a new buffer (see `supported-media'), otherwise try to open the filename with the system's default external program, using `xdg-open'.
-The user can set `*open-file-function*' to another function to decide what to do with the file."
+FILENAME is the full path of the file (or directory), as a string, with no tilde
+\(it would be expanded before).
+By default, try to open the filename with the system's default external program,
+using `xdg-open'.
+The user can set `*open-file-function*' to another function to decide what to do
+with the file."
   (handler-case
       (cond
         ((and (uiop:directory-pathname-p filename)
               (uiop:directory-exists-p filename))
-         (set-url-to-buffer (format nil "file://~a" (uiop:ensure-directory-pathname filename))
-                            :new-buffer-p new-buffer-p))
+         (set-url (format nil "file://~a" (uiop:ensure-directory-pathname filename))
+                  :buffer (make-buffer-focus :url nil)))
         ((supported-media filename)
-         (set-url-to-buffer (format nil "file://~a" filename)
-                            :new-buffer-p new-buffer-p))
+         (set-url (format nil "file://~a" filename)
+                  :buffer (make-buffer-focus :url nil)))
         (t
-         (uiop:launch-program (list "xdg-open" (namestring filename)))))
+         (uiop:launch-program
+          #+linux
+          (list "xdg-open" (namestring filename))
+          #+darwin
+          (list "open" (namestring filename)))))
     ;; We can probably signal something and display a notification.
     (error (c) (log:error "Error opening ~a: ~a~&" filename c))))
 

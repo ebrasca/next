@@ -14,6 +14,7 @@
 (defclass command ()
   ((sym :accessor sym :initarg :sym :type symbol :initform nil) ; TODO: Make constructor?
    (pkg :accessor pkg :initarg :pkg :type package :initform nil)
+   (sexp :accessor sexp :initarg :sexp :type sexp :initform nil)
    (access-time :accessor access-time :type integer :initform 0
                 :documentation "Last time this command was called from minibuffer.
 This can be used to order the commands.")))
@@ -56,7 +57,7 @@ Regardless of the hook, the command returns the last expression of BODY."
        (unless (find-if (lambda (c) (and (eq (sym c) ',name)
                                          (eq (pkg c) *package*)))
                         %%command-list)
-         (push (make-instance 'command :sym ',name :pkg *package*) %%command-list))
+         (push (make-instance 'command :sym ',name :pkg *package* :sexp '(progn ,@body)) %%command-list))
        @export
        ;; We use defun to define the command instead of storing a lambda because we want
        ;; to be able to call the foo command from Lisp with (FOO ...).
@@ -145,9 +146,12 @@ Otherwise list all commands."
       %%command-list))
 
 (defmethod object-string ((command command))
+  (str:downcase (sym command)))
+
+(defmethod object-display ((command command))
   ;; Use `last-active-window' for speed, or else the minibuffer will stutter
   ;; because of the RPC calls.
-  (let* ((buffer (active-buffer (last-active-window *interface*)))
+  (let* ((buffer (active-buffer (last-active-window *browser*)))
          (scheme (current-keymap-scheme buffer))
          (bindings '()))
     (loop for mode in (modes buffer)
@@ -197,3 +201,73 @@ This function can be `funcall'ed."
                           :show-completion-count nil)))
     (setf (access-time command) (get-internal-real-time))
     (run command)))
+
+(defclass hook-description ()
+  ((name :accessor name :initarg :name
+         :initform ""
+         :type string
+         :documentation "The hook name.")
+   (value :accessor value :initarg :value
+          :documentation "The hook value.")))
+
+(defmethod object-string ((hook-desc hook-description))
+  (name hook-desc))
+
+(defmethod object-string ((handler next-hooks:handler))
+  (str:downcase (next-hooks:name handler)))
+
+(defun hook-completion-filter (input)
+  (flet ((list-hooks (object)
+           (mapcar (lambda (hook)
+                     (make-instance 'hook-description
+                                    :name (str:downcase (closer-mop:slot-definition-name hook))
+                                    :value (funcall (symbol-function (closer-mop:slot-definition-name hook))
+                                                    object)))
+                   (delete-if-not (lambda (s)
+                                    (str:ends-with-p "-hook"
+                                                     (str:downcase (closer-mop:slot-definition-name s))))
+                                  (closer-mop:class-slots (class-of object))))))
+    (let ((window-hooks
+            (list-hooks (last-active-window *browser*)))
+          (buffer-hooks (list-hooks (current-buffer)))
+          (browser-hooks (list-hooks *browser*)))
+      (fuzzy-match input
+                   (append window-hooks
+                           buffer-hooks
+                           browser-hooks)))))
+
+(defun handler-completion-filter (hook)
+  (lambda (input)
+    (fuzzy-match input
+                 (next-hooks:handlers hook))))
+
+(defun disabled-handler-completion-filter (hook)
+  (lambda (input)
+    (fuzzy-match input
+                 (next-hooks:disabled-handlers hook))))
+
+(define-command disable-hook-handler ()
+  "Remove handler(s) from a hook."
+  (with-result (hook-desc (read-from-minibuffer
+                           (make-minibuffer
+                            :input-prompt "Hook where to disable handler"
+                            :completion-function 'hook-completion-filter)))
+    (with-result (handler
+                  (read-from-minibuffer
+                   (make-minibuffer
+                    :input-prompt (format nil "Disable handler from ~a" (name hook-desc))
+                    :completion-function (handler-completion-filter (value hook-desc)))))
+      (next-hooks:disable-hook (value hook-desc) handler))))
+
+(define-command enable-hook-handler ()
+  "Remove handler(s) from a hook."
+  (with-result (hook-desc (read-from-minibuffer
+                           (make-minibuffer
+                            :input-prompt "Hook where to enable handler"
+                            :completion-function 'hook-completion-filter)))
+    (with-result (handler
+                  (read-from-minibuffer
+                   (make-minibuffer
+                    :input-prompt (format nil "Enable handler from ~a" (name hook-desc))
+                    :completion-function (disabled-handler-completion-filter (value hook-desc)))))
+      (next-hooks:enable-hook (value hook-desc) handler))))

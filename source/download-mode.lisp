@@ -13,10 +13,10 @@
                                              :buffer (make-buffer :title "*Downloads*"))))
          (contents (cl-markup:markup
                     (:h1 "Downloads")
-                    (:p (:b "Directory: ") (namestring (or (download-directory *interface*)
+                    (:p (:b "Directory: ") (namestring (or (download-directory *browser*)
                                                            (download-manager:default-download-directory))))
                     (:span              ; TODO: Do we need this span?  We need something because of the loop.
-                     (loop for d in (downloads *interface*)
+                     (loop for d in (downloads *browser*)
                            collect
                            (cl-markup:markup
                             (:p
@@ -48,13 +48,13 @@
                     (:p (:em "Open a file with " (:code "M-x download-open-file") "."))))
          (insert-content (ps:ps (setf (ps:@ document Body |innerHTML|)
                                       (ps:lisp contents)))))
-    (rpc-buffer-evaluate-javascript download-buffer insert-content)
+    (ipc-buffer-evaluate-javascript download-buffer insert-content)
     download-buffer))
 
 (define-command download-list ()
   "Display a buffer listing all downloads."
-  (unless (download-watcher *interface*)
-    (setf (download-watcher *interface*) (bt:make-thread #'download-watch)))
+  (unless (download-watcher *browser*)
+    (setf (download-watcher *browser*) (bt:make-thread #'download-watch)))
  (set-current-buffer (download-refresh)))
 
 (define-command download-url ()
@@ -72,7 +72,7 @@
 
 (defun get-downloaded-filenames ()
   "Return the list of downloaded filenames of the current session, as strings."
-  (mapcar #'download-manager:filename (downloads *interface*)))
+  (mapcar #'download-manager:filename (downloads *browser*)))
 
 (defun downloaded-files-completion-filter ()
   (let ((filenames (get-downloaded-filenames)))
